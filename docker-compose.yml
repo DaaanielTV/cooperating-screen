@@ -5,7 +5,7 @@ services:
     build:
       context: ./signaling_server
       dockerfile: Dockerfile
-    container_name: cosc-signaling-server
+    container_name: cooperating-screen-signaling-server
     ports:
       - "3000:3000"
     environment:
@@ -16,8 +16,8 @@ services:
     volumes:
       - ./signaling_server/src:/app/src
     networks:
-      - cosc-network
+      - cooperating-screen-network
 
 networks:
-  cosc-network:
+  cooperating-screen-network:
     driver: bridge

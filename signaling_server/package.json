@@ -1,7 +1,7 @@
 {
-  "name": "cosc-signaling-server",
+  "name": "cooperating-screen-signaling-server",
   "version": "1.0.0",
-  "description": "WebSocket signaling server for CooperatingScreen P2P connections",
+  "description": "WebSocket signaling server for Cooperating Screen P2P connections",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -16,7 +16,7 @@
     "screen-sharing"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "dependencies": {
     "express": "^4.18.2",
     "ws": "^8.14.2",

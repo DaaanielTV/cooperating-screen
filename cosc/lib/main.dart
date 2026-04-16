@@ -31,11 +31,11 @@ Future<void> main() async {
     anonKey: supabaseAnonKey,
   );
   
-  runApp(const CooperatingScreenApp());
+  runApp(const CooperatingScreenApplication());
 }
 
-class CooperatingScreenApp extends StatelessWidget {
-  const CooperatingScreenApp({Key? key}) : super(key: key);
+class CooperatingScreenApplication extends StatelessWidget {
+  const CooperatingScreenApplication({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +62,7 @@ class CooperatingScreenApp extends StatelessWidget {
       child: Consumer<AppSettings>(
         builder: (context, settings, _) {
           return MaterialApp(
-            title: 'CooperatingScreen',
+            title: 'Cooperating Screen',
             theme: ThemeData(
               primarySwatch: Colors.blue,
               useMaterial3: true,

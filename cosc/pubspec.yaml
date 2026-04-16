@@ -1,5 +1,5 @@
-name: cosc
-description: "CooperatingScreen - Cross-device screen sharing application"
+name: cooperating_screen
+description: "Cooperating Screen - Cross-device screen sharing application"
 publish_to: 'none'
 
 version: 1.0.0+1
