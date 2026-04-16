@@ -77,7 +77,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
               ),
               const SizedBox(height: 32),
               const Text(
-                'Welcome to CooperatingScreen',
+                'Welcome to Cooperating Screen',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,

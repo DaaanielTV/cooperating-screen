@@ -1,72 +1,36 @@
-# CooperatingScreen Flutter App
+# Cooperating Screen Flutter App
 
-Flutter mobile application for cross-device screen sharing.
+Flutter mobile client for Cooperating Screen.
 
-## Prerequisites
+## Overview
 
-- Flutter SDK (3.0.0 or higher)
-- Dart SDK (3.0.0 or higher)
-- Android Studio / Xcode
-- Git
+This app provides device onboarding, pairing flows, and UI entry points for WebRTC-powered screen sharing sessions.
 
 ## Setup
 
-1. **Install dependencies:**
-   ```bash
-   cd cosc
-   flutter pub get
-   ```
-
-2. **Configure Supabase:**
-   - Update `lib/main.dart` with your Supabase URL and Anon Key
-   - Or use environment variables (recommended for production)
-
-3. **Run the app:**
-   ```bash
-   flutter run
-   ```
-
-## Project Structure
-
+```bash
+cd cosc
+flutter pub get
+flutter run
 ```
-lib/
-├── models/          # Data models (Device, PairingSession, etc.)
-├── screens/         # UI screens
-├── services/        # Business logic (Supabase, Signaling)
-├── utils/           # Utility functions
-├── widgets/         # Reusable widgets
-└── main.dart       # App entry point
-```
-
-## Features (Phase 1)
-
-- ✅ Device registration with unique serial
-- ✅ Local device persistence
-- ✅ Supabase authentication setup
-- ⏳ Device pairing system (Phase 2)
-- ⏳ WebRTC connection (Phase 3)
-- ⏳ Screen sharing (Phase 3)
 
 ## Development
 
-### Hot Reload
-```bash
-flutter run
-# Press 'r' in terminal for hot reload
-```
+- Update Supabase values in `lib/main.dart` for local testing.
+- Use `flutter analyze` and `flutter test` before opening pull requests.
 
-### Build Release
-```bash
-flutter build apk      # Android
-flutter build ios      # iOS
-```
-
-## Testing
+## Build
 
 ```bash
-flutter test
+flutter build apk
+flutter build ios
 ```
 
-## Documentation
+## Troubleshooting
 
-See [../Readme.md](../Readme.md) for the complete technical plan.
+- If dependencies fail to resolve: run `flutter clean && flutter pub get`.
+- If platform builds fail: verify Android Studio/Xcode setup and SDK paths.
+
+## Related docs
+
+See [../README.md](../README.md) for top-level project and deployment guidance.

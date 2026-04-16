@@ -60,3 +60,19 @@ Thumbs.db
 *.swo
 *~
 .#*
+
+
+# Logs and runtime artifacts
+logs/
+*.log
+coverage/
+*.pid
+
+# JavaScript build outputs
+dist/
+out/
+
+# Flutter/Dart generated lockfiles and reports
+.pub/
+.flutter-plugins
+.flutter-plugins-dependencies

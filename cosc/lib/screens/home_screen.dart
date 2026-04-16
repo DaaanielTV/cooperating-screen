@@ -29,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CooperatingScreen'),
+        title: const Text('Cooperating Screen'),
         centerTitle: true,
         actions: [
           IconButton(
