@@ -119,3 +119,70 @@ CREATE TRIGGER update_pairing_sessions_updated_at
   BEFORE UPDATE ON pairing_sessions
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
+
+-- Rooms table for multi-device sessions
+CREATE TABLE IF NOT EXISTS rooms (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  room_code VARCHAR(6) UNIQUE NOT NULL,
+  host_device VARCHAR(12) NOT NULL,
+  room_name VARCHAR(255),
+  max_participants INTEGER DEFAULT 2,
+  is_public BOOLEAN DEFAULT true,
+  status VARCHAR(50) DEFAULT 'waiting', -- waiting, active, ended
+  created_at TIMESTAMP DEFAULT now(),
+  expires_at TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+-- Room participants table
+CREATE TABLE IF NOT EXISTS room_participants (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
+  device_serial VARCHAR(12) NOT NULL,
+  device_name VARCHAR(255),
+  role VARCHAR(50) DEFAULT 'participant', -- host, participant
+  joined_at TIMESTAMP DEFAULT now(),
+  is_active BOOLEAN DEFAULT true,
+  UNIQUE(room_id, device_serial)
+);
+
+-- Create indexes for room queries
+CREATE INDEX IF NOT EXISTS idx_rooms_code ON rooms(room_code);
+CREATE INDEX IF NOT EXISTS idx_rooms_status ON rooms(status);
+CREATE INDEX IF NOT EXISTS idx_room_participants_room ON room_participants(room_id);
+CREATE INDEX IF NOT EXISTS idx_room_participants_device ON room_participants(device_serial);
+
+-- Enable RLS for rooms
+ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE room_participants ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for rooms
+CREATE POLICY "Rooms are readable" ON rooms FOR SELECT USING (true);
+CREATE POLICY "Rooms are insertable" ON rooms FOR INSERT WITH CHECK (true);
+CREATE POLICY "Rooms are updatable" ON rooms FOR UPDATE USING (true) WITH CHECK (true);
+
+CREATE POLICY "Room participants are readable" ON room_participants FOR SELECT USING (true);
+CREATE POLICY "Room participants are insertable" ON room_participants FOR INSERT WITH CHECK (true);
+CREATE POLICY "Room participants are updatable" ON room_participants FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Room participants are deletable" ON room_participants FOR DELETE USING (true);
+
+-- Create function to generate room code
+CREATE OR REPLACE FUNCTION generate_room_code()
+RETURNS VARCHAR(6) AS $$
+DECLARE
+  code VARCHAR(6);
+  is_unique BOOLEAN := false;
+BEGIN
+  WHILE NOT is_unique LOOP
+    code := LPAD(FLOOR(RANDOM() * 1000000)::TEXT, 6, '0');
+    SELECT INTO is_unique NOT EXISTS (SELECT 1 FROM rooms WHERE room_code = code);
+  END LOOP;
+  RETURN code;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create triggers for room updated_at
+CREATE TRIGGER update_rooms_updated_at
+  BEFORE UPDATE ON rooms
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();

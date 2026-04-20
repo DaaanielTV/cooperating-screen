@@ -88,6 +88,15 @@ class SignalingService {
       case 'connection_state':
         _onConnectionStateChange(data);
         break;
+      case 'room_created':
+      case 'room_joined':
+      case 'room_left':
+      case 'participant_joined':
+      case 'participant_left':
+      case 'host_changed':
+      case 'room_list':
+        print('Room message: $type');
+        break;
       default:
         print('Unknown message type: $type');
     }

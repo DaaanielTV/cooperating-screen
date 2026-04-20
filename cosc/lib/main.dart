@@ -12,6 +12,7 @@ import 'screens/device_setup_screen.dart';
 import 'screens/pairing_request_screen.dart';
 import 'screens/pairing_confirmation_screen.dart';
 import 'screens/device_list_screen.dart';
+import 'screens/room_screen.dart';
 import 'screens/webrtc_call_screen.dart';
 import 'screens/screen_share_screen.dart';
 import 'screens/settings_screen.dart';
@@ -81,6 +82,7 @@ class CooperatingScreenApplication extends StatelessWidget {
               '/pairing-request': (context) => const PairingRequestScreen(),
               '/pairing-confirm': (context) => const PairingConfirmationScreen(),
               '/devices': (context) => const DeviceListScreen(),
+              '/room': (context) => const RoomScreen(),
               '/webrtc-call': (context) => const WebRTCCallScreen(
                 remoteDeviceName: 'Remote Device',
                 remoteDeviceSerial: 'SERIAL123',

@@ -10,6 +10,7 @@ class ConnectionState extends ChangeNotifier {
   bool _isVideoEnabled = true;
   bool _isConnected = false;
   String? _errorMessage;
+  String? _roomCode;
 
   WebRTCService? get webRtcService => _webRtcService;
   RTCPeerConnectionState? get peerConnectionState => _peerConnectionState;
@@ -18,9 +19,24 @@ class ConnectionState extends ChangeNotifier {
   bool get isVideoEnabled => _isVideoEnabled;
   bool get isConnected => _isConnected;
   String? get errorMessage => _errorMessage;
+  String? get roomCode => _roomCode;
 
-  Future<void> initialize(WebRTCService webRtcService) async {
-    _webRtcService = webRtcService;
+  Future<void> initialize({
+    required String signalingUrl,
+    required String deviceSerial,
+    String? targetDevice,
+    String? roomCode,
+  }) async {
+    _roomCode = roomCode;
+    
+    _webRtcService = WebRTCService(
+      signalingUrl: signalingUrl,
+      deviceSerial: deviceSerial,
+      targetDevice: targetDevice,
+      roomCode: roomCode,
+    );
+    
+    await _webRtcService!.initialize();
     
     // Setup callbacks
     _webRtcService!.onConnectionStateChange = (state) {

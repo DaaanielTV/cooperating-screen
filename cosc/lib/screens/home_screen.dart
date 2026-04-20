@@ -108,6 +108,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     label: const Text('Pair New Device'),
                   ),
                   const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).pushNamed('/room'),
+                    icon: const Icon(Icons.meeting_room),
+                    label: const Text('Join Room'),
+                  ),
+                  const SizedBox(height: 16),
                   TextButton(
                     onPressed: () => Navigator.of(context).pushNamed('/devices'),
                     child: const Text('View All Paired Devices'),

@@ -1,15 +1,19 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'dart:convert';
 import 'signaling_service.dart';
+import 'room_service.dart';
 
 class WebRTCService {
   late RTCPeerConnection _peerConnection;
-  late SignalingService _signalingService;
+  SignalingService? _signalingService;
+  RoomService? _roomService;
   
   RTCVideoRenderer? localRenderer;
   RTCVideoRenderer? remoteRenderer;
   
-  // STUN and TURN servers
+  String? _targetDevice;
+  String? _roomCode;
+  
   static const List<String> stunServers = [
     'stun:stun.l.google.com:19302',
     'stun:stun1.l.google.com:19302',
@@ -25,9 +29,27 @@ class WebRTCService {
   Function(RTCIceGatheringState)? onIceGatheringStateChange;
   Function(MediaStream)? onRemoteStreamReceived;
   Function()? onConnectionLost;
+  Function(Map<String, dynamic>)? onRoomOfferReceived;
+  Function(Map<String, dynamic>)? onRoomAnswerReceived;
+  Function(Map<String, dynamic>)? onRoomIceCandidateReceived;
 
-  WebRTCService({required SignalingService signalingService}) {
-    _signalingService = signalingService;
+  WebRTCService({
+    SignalingService? signalingService,
+    RoomService? roomService,
+    String? targetDevice,
+    String? roomCode,
+  }) : _signalingService = signalingService,
+       _roomService = roomService,
+       _targetDevice = targetDevice,
+       _roomCode = roomCode;
+
+  Future<bool> initialize({bool useAudio = true, bool useVideo = true}) async {
+    if (_roomService != null) {
+      _roomService!.onOfferReceived = (data) => onRoomOfferReceived?.call(data);
+      _roomService!.onAnswerReceived = (data) => onRoomAnswerReceived?.call(data);
+      _roomService!.onIceCandidateReceived = (data) => onRoomIceCandidateReceived?.call(data);
+    }
+    return true;
   }
 
   /// Initialize WebRTC peer connection

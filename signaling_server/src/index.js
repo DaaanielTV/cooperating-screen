@@ -42,6 +42,7 @@ const wss = new WebSocketServer({
 // Store active connections
 const clients = new Map(); // Map<deviceSerial, WebSocket>
 const sessionMap = new Map(); // Map<sessionId, { device1, device2 }>
+const rooms = new Map(); // Map<roomCode, { host, participants[], maxParticipants, status }>
 
 // WebSocket connection handler
 wss.on('connection', (ws, req) => {
@@ -68,6 +69,14 @@ wss.on('connection', (ws, req) => {
       }
 
       const parsedMessage = JSON.parse(message);
+      
+      // Extract device_serial from message if available (for room operations before registration)
+      if (parsedMessage.data?.device_serial && !deviceSerial) {
+        setDeviceSerial(parsedMessage.data.device_serial);
+      } else if (parsedMessage.data?.deviceSerial && !deviceSerial) {
+        setDeviceSerial(parsedMessage.data.deviceSerial);
+      }
+      
       await handleSignalingMessage(ws, parsedMessage, (serial) => {
         deviceSerial = serial;
       });
@@ -105,6 +114,22 @@ async function handleSignalingMessage(ws, message, setDeviceSerial) {
 
     case 'pairing_request':
       handlePairingRequest(ws, data);
+      break;
+
+    case 'room_create':
+      handleRoomCreate(ws, data);
+      break;
+
+    case 'room_join':
+      handleRoomJoin(ws, data);
+      break;
+
+    case 'room_leave':
+      handleRoomLeave(ws, data);
+      break;
+
+    case 'room_list':
+      handleRoomList(ws, data);
       break;
 
     case 'offer':
@@ -199,66 +224,334 @@ function handlePairingRequest(ws, data) {
 }
 
 /**
- * Handle WebRTC offer
+ * Handle room creation
+ */
+function handleRoomCreate(ws, data) {
+  const { device_serial, room_name, max_participants, is_public } = data;
+
+  if (!device_serial) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      data: { error: 'Missing device_serial' },
+    }));
+    return;
+  }
+
+  const room_code = Math.floor(Math.random() * 1000000)
+    .toString()
+    .padStart(6, '0');
+
+  const room = {
+    host: device_serial,
+    name: room_name || `Room ${room_code}`,
+    participants: [device_serial],
+    maxParticipants: max_participants || 2,
+    isPublic: is_public !== false,
+    status: 'waiting',
+    createdAt: new Date().toISOString(),
+  };
+
+  rooms.set(room_code, room);
+
+  ws.send(JSON.stringify({
+    type: 'room_created',
+    data: {
+      room_code,
+      room_name: room.name,
+      max_participants: room.maxParticipants,
+      is_public: room.isPublic,
+      participants: room.participants,
+    },
+  }));
+
+  logger.info(`Room created: ${room_code} by ${device_serial}`);
+}
+
+/**
+ * Handle room join
+ */
+function handleRoomJoin(ws, data) {
+  const { room_code, device_serial } = data;
+
+  if (!room_code || !device_serial) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      data: { error: 'Missing room_code or device_serial' },
+    }));
+    return;
+  }
+
+  const room = rooms.get(room_code);
+
+  if (!room) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      data: { error: 'Room not found' },
+    }));
+    return;
+  }
+
+  if (room.participants.length >= room.maxParticipants) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      data: { error: 'Room is full' },
+    }));
+    return;
+  }
+
+  if (room.participants.includes(device_serial)) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      data: { error: 'Already in room' },
+    }));
+    return;
+  }
+
+  room.participants.push(device_serial);
+
+  ws.send(JSON.stringify({
+    type: 'room_joined',
+    data: {
+      room_code,
+      room_name: room.name,
+      host: room.host,
+      participants: room.participants,
+    },
+  }));
+
+  room.participants.forEach((participant) => {
+    if (participant !== device_serial) {
+      const participantWs = clients.get(participant);
+      if (participantWs) {
+        participantWs.send(JSON.stringify({
+          type: 'participant_joined',
+          data: {
+            device_serial,
+            participants: room.participants,
+          },
+        }));
+      }
+    }
+  });
+
+  logger.info(`Device ${device_serial} joined room ${room_code}`);
+}
+
+/**
+ * Handle room leave
+ */
+function handleRoomLeave(ws, data) {
+  const { room_code, device_serial } = data;
+
+  if (!room_code || !device_serial) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      data: { error: 'Missing room_code or device_serial' },
+    }));
+    return;
+  }
+
+  const room = rooms.get(room_code);
+
+  if (!room) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      data: { error: 'Room not found' },
+    }));
+    return;
+  }
+
+  room.participants = room.participants.filter((p) => p !== device_serial);
+
+  if (room.participants.length === 0) {
+    rooms.delete(room_code);
+    logger.info(`Room ${room_code} deleted (empty)`);
+  } else {
+    room.participants.forEach((participant) => {
+      const participantWs = clients.get(participant);
+      if (participantWs) {
+        participantWs.send(JSON.stringify({
+          type: 'participant_left',
+          data: {
+            device_serial,
+            participants: room.participants,
+          },
+        }));
+      }
+    });
+
+    if (room.host === device_serial) {
+      room.host = room.participants[0];
+      room.participants.forEach((participant) => {
+        const participantWs = clients.get(participant);
+        if (participantWs) {
+          participantWs.send(JSON.stringify({
+            type: 'host_changed',
+            data: {
+              new_host: room.host,
+            },
+          }));
+        }
+      });
+    }
+
+    ws.send(JSON.stringify({
+      type: 'room_left',
+      data: { room_code },
+    }));
+
+    logger.info(`Device ${device_serial} left room ${room_code}`);
+  }
+}
+
+/**
+ * Handle room list request
+ */
+function handleRoomList(ws, data) {
+  const publicRooms = [];
+
+  rooms.forEach((room, code) => {
+    if (room.isPublic && room.status === 'waiting') {
+      publicRooms.push({
+        room_code: code,
+        room_name: room.name,
+        host: room.host,
+        participants: room.participants.length,
+        max_participants: room.maxParticipants,
+      });
+    }
+  });
+
+  ws.send(JSON.stringify({
+    type: 'room_list',
+    data: { rooms: publicRooms },
+  }));
+
+  logger.info(`Room list sent: ${publicRooms.length} rooms`);
+}
+
+/**
+ * Handle WebRTC offer (supports room-based and direct)
  */
 function handleOffer(ws, data) {
-  const { target_device, sdp } = data;
+  const { target_device, room_code, sdp } = data;
 
-  const targetWs = clients.get(target_device);
+  if (room_code) {
+    const room = rooms.get(room_code);
+    if (!room) {
+      ws.send(JSON.stringify({
+        type: 'error',
+        data: { error: 'Room not found' },
+      }));
+      return;
+    }
 
-  if (!targetWs) {
-    ws.send(JSON.stringify({
-      type: 'error',
-      data: { error: 'Target device not available' },
+    room.participants.forEach((participant) => {
+      const participantWs = clients.get(participant);
+      if (participantWs && participantWs !== ws) {
+        participantWs.send(JSON.stringify({
+          type: 'offer',
+          data: { sdp, from: data.device_serial },
+        }));
+      }
+    });
+
+    logger.info(`WebRTC offer relayed to room ${room_code}`);
+  } else if (target_device) {
+    const targetWs = clients.get(target_device);
+
+    if (!targetWs) {
+      ws.send(JSON.stringify({
+        type: 'error',
+        data: { error: 'Target device not available' },
+      }));
+      return;
+    }
+
+    targetWs.send(JSON.stringify({
+      type: 'offer',
+      data: { sdp },
     }));
-    return;
+
+    logger.info(`WebRTC offer relayed to ${target_device}`);
   }
-
-  targetWs.send(JSON.stringify({
-    type: 'offer',
-    data: { sdp },
-  }));
-
-  logger.info(`WebRTC offer relayed to ${target_device}`);
 }
 
 /**
- * Handle WebRTC answer
+ * Handle WebRTC answer (supports room-based and direct)
  */
 function handleAnswer(ws, data) {
-  const { target_device, sdp } = data;
+  const { target_device, room_code, sdp } = data;
 
-  const targetWs = clients.get(target_device);
+  if (room_code) {
+    const room = rooms.get(room_code);
+    if (!room) {
+      ws.send(JSON.stringify({
+        type: 'error',
+        data: { error: 'Room not found' },
+      }));
+      return;
+    }
 
-  if (!targetWs) {
-    ws.send(JSON.stringify({
-      type: 'error',
-      data: { error: 'Target device not available' },
+    room.participants.forEach((participant) => {
+      const participantWs = clients.get(participant);
+      if (participantWs && participantWs !== ws) {
+        participantWs.send(JSON.stringify({
+          type: 'answer',
+          data: { sdp, from: data.device_serial },
+        }));
+      }
     }));
-    return;
+
+    logger.info(`WebRTC answer relayed to room ${room_code}`);
+  } else if (target_device) {
+    const targetWs = clients.get(target_device);
+
+    if (!targetWs) {
+      ws.send(JSON.stringify({
+        type: 'error',
+        data: { error: 'Target device not available' },
+      }));
+      return;
+    }
+
+    targetWs.send(JSON.stringify({
+      type: 'answer',
+      data: { sdp },
+    }));
+
+    logger.info(`WebRTC answer relayed to ${target_device}`);
   }
-
-  targetWs.send(JSON.stringify({
-    type: 'answer',
-    data: { sdp },
-  }));
-
-  logger.info(`WebRTC answer relayed to ${target_device}`);
 }
 
 /**
- * Handle ICE candidates
+ * Handle ICE candidates (supports room-based and direct)
  */
 function handleIceCandidate(ws, data) {
-  const { target_device, candidate } = data;
+  const { target_device, room_code, candidate } = data;
 
-  const targetWs = clients.get(target_device);
+  if (room_code) {
+    const room = rooms.get(room_code);
+    if (!room) return;
 
-  if (targetWs) {
-    targetWs.send(JSON.stringify({
-      type: 'ice_candidate',
-      data: { candidate },
-    }));
+    room.participants.forEach((participant) => {
+      const participantWs = clients.get(participant);
+      if (participantWs && participantWs !== ws) {
+        participantWs.send(JSON.stringify({
+          type: 'ice_candidate',
+          data: { candidate, from: data.device_serial },
+        }));
+      }
+    });
+  } else if (target_device) {
+    const targetWs = clients.get(target_device);
+
+    if (targetWs) {
+      targetWs.send(JSON.stringify({
+        type: 'ice_candidate',
+        data: { candidate },
+      }));
+    }
   }
 }
 
@@ -295,6 +588,7 @@ app.get('/stats', (req, res) => {
   res.json({
     connected_clients: clients.size,
     active_sessions: sessionMap.size,
+    active_rooms: rooms.size,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
