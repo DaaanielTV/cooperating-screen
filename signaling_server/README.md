@@ -33,10 +33,10 @@ docker build -t cooperating-screen-signaling-server .
 docker run -p 3000:3000 cooperating-screen-signaling-server
 ```
 
-Or from repo root:
+Or from repo root (backend + web UI):
 
 ```bash
-docker-compose up --build signaling-server
+docker-compose up --build
 ```
 
 ## Endpoints

@@ -3,7 +3,7 @@
  * Prevents abuse and DDoS attacks
  */
 
-class RateLimiter {
+export default class RateLimiter {
   constructor(options = {}) {
     this.windowMs = options.windowMs || 60000; // 1 minute default
     this.maxRequests = options.maxRequests || 100; // 100 requests per minute
@@ -17,16 +17,16 @@ class RateLimiter {
    */
   isAllowed(identifier) {
     const now = Date.now();
-    
+
     if (!this.requests.has(identifier)) {
       this.requests.set(identifier, [now]);
       return true;
     }
 
     let requestTimes = this.requests.get(identifier);
-    
+
     // Remove old requests outside time window
-    requestTimes = requestTimes.filter(time => now - time <= this.windowMs);
+    requestTimes = requestTimes.filter((time) => now - time <= this.windowMs);
     this.requests.set(identifier, requestTimes);
 
     if (requestTimes.length >= this.maxRequests) {
@@ -44,14 +44,14 @@ class RateLimiter {
    */
   getRemainingRequests(identifier) {
     const now = Date.now();
-    
+
     if (!this.requests.has(identifier)) {
       return this.maxRequests;
     }
 
-    let requestTimes = this.requests.get(identifier);
-    const validRequests = requestTimes.filter(time => now - time <= this.windowMs).length;
-    
+    const requestTimes = this.requests.get(identifier);
+    const validRequests = requestTimes.filter((time) => now - time <= this.windowMs).length;
+
     return Math.max(0, this.maxRequests - validRequests);
   }
 
@@ -73,7 +73,7 @@ class RateLimiter {
     const oldestRequest = Math.min(...requestTimes);
     const resetAt = oldestRequest + this.windowMs;
     const now = Date.now();
-    
+
     return Math.max(0, Math.ceil((resetAt - now) / 1000));
   }
 
@@ -100,7 +100,7 @@ class RateLimiter {
   static middleware(limiter) {
     return (req, res, next) => {
       const identifier = req.ip || req.connection.remoteAddress || 'unknown';
-      
+
       if (!limiter.isAllowed(identifier)) {
         const resetTime = limiter.getResetTime(identifier);
         res.set('Retry-After', resetTime);
@@ -112,7 +112,7 @@ class RateLimiter {
 
       res.set('X-RateLimit-Remaining', limiter.getRemainingRequests(identifier));
       res.set('X-RateLimit-Reset', limiter.getResetTime(identifier));
-      
+
       next();
     };
   }
@@ -125,7 +125,7 @@ class RateLimiter {
   static wsValidator(limiter) {
     return (info, callback) => {
       const ip = info.req.socket.remoteAddress || 'unknown';
-      
+
       if (!limiter.isAllowed(ip)) {
         return callback(false, 429, 'Too many connection attempts');
       }
@@ -134,5 +134,3 @@ class RateLimiter {
     };
   }
 }
-
-module.exports = RateLimiter;
