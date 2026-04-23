@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CooperatingScreen Web Client</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>CooperatingScreen Web UI</h1>
+    <p class="sub">WebSocket-Client für Registrierung, Räume und Signaling.</p>
+
+    <section class="card">
+      <h2>Verbindung</h2>
+      <label>WebSocket URL</label>
+      <input id="wsUrl" value="ws://localhost:3000" />
+      <label>Device Serial</label>
+      <input id="deviceSerial" placeholder="z. B. web-client-01" />
+      <div class="row">
+        <button id="connectBtn">Verbinden</button>
+        <button id="disconnectBtn" class="secondary">Trennen</button>
+      </div>
+      <p id="status">Status: getrennt</p>
+    </section>
+
+    <section class="card">
+      <h2>Räume</h2>
+      <label>Room Name</label>
+      <input id="roomName" placeholder="Mein Raum" />
+      <label>Max Teilnehmer</label>
+      <input id="maxParticipants" type="number" min="2" value="2" />
+      <div class="row">
+        <button id="createRoomBtn">Raum erstellen</button>
+        <button id="listRoomsBtn" class="secondary">Räume laden</button>
+      </div>
+
+      <label>Room Code</label>
+      <input id="roomCode" placeholder="6-stelliger Code" />
+      <div class="row">
+        <button id="joinRoomBtn">Raum beitreten</button>
+        <button id="leaveRoomBtn" class="secondary">Raum verlassen</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Debug Log</h2>
+      <pre id="log"></pre>
+    </section>
+  </main>
+
+  <script src="./main.js"></script>
+</body>
+</html>

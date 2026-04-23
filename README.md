@@ -6,7 +6,8 @@ Cooperating Screen is an open-source cross-device screen sharing project built w
 
 This repository contains:
 - A Flutter mobile app for device setup, pairing, and WebRTC session management.
-- A Node.js signaling server for WebSocket-based peer signaling.
+- A Node.js signaling server for WebSocket-based peer signaling (Docker-ready for VPS).
+- A lightweight web client UI (browser) to connect and manage signaling rooms.
 - Supporting deployment and database artifacts.
 
 ## Features / Purpose
@@ -78,11 +79,14 @@ Flutter app configuration placeholders live in `cosc/lib/main.dart` and should b
 
 ## Build / Run Instructions
 
-### Docker Compose
+### Docker Compose (Backend + Web UI)
 
 ```bash
-docker-compose up --build signaling-server
+docker-compose up --build
 ```
+
+- Signaling backend: `ws://localhost:3000`
+- Web UI client: `http://localhost:8080`
 
 ### Production signaling server
 
