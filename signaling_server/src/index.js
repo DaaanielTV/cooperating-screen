@@ -12,11 +12,22 @@ dotenv.config();
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 const app = express();
 const port = Number(process.env.PORT || 3000);
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 const httpLimiter = new RateLimiter({ windowMs: 60000, maxRequests: 100 });
 const wsLimiter = new RateLimiter({ windowMs: 60000, maxRequests: 30 });
 
-app.use(cors());
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0) return callback(new Error('CORS origin not allowed'));
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('CORS origin not allowed'));
+  },
+}));
 app.use(express.json());
 app.use(RateLimiter.middleware(httpLimiter));
 
@@ -55,18 +66,19 @@ wss.on('connection', (ws, req) => {
         }
       }
 
-      if (deviceSerial && !wsLimiter.isAllowed(deviceSerial)) {
+      const limiterId = deviceSerial || clientIp;
+      if (!wsLimiter.isAllowed(limiterId)) {
         ws.send(JSON.stringify({
           type: 'error',
           data: {
             error: 'Too many messages',
-            retryAfter: wsLimiter.getResetTime(deviceSerial),
+            retryAfter: wsLimiter.getResetTime(limiterId),
           },
         }));
         return;
       }
 
-      await handleSignalingMessage(ws, parsedMessage, setDeviceSerial);
+      await handleSignalingMessage(ws, parsedMessage, setDeviceSerial, deviceSerial);
     } catch (error) {
       logger.error({ err: error }, 'Error handling websocket message');
       ws.send(JSON.stringify({ type: 'error', data: { error: 'Invalid message format' } }));
@@ -85,8 +97,17 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-async function handleSignalingMessage(ws, message, setDeviceSerial) {
+async function handleSignalingMessage(ws, message, setDeviceSerial, boundDeviceSerial) {
   const { type, data = {} } = message;
+  if (type !== 'device_registration' && !boundDeviceSerial) {
+    ws.send(JSON.stringify({ type: 'error', data: { error: 'Device must register first' } }));
+    return;
+  }
+
+  if (!_isAuthorizedMessage(type, data, boundDeviceSerial)) {
+    ws.send(JSON.stringify({ type: 'error', data: { error: 'Unauthorized message sender' } }));
+    return;
+  }
 
   switch (type) {
     case 'device_registration':
@@ -356,6 +377,36 @@ function handleIceCandidate(ws, data) {
 
 function handleConnectionState(data) {
   logger.info({ state: data.state, target: data.target_device }, 'Connection state update');
+}
+
+function _isAuthorizedMessage(type, data, boundDeviceSerial) {
+  if (type === 'device_registration') return true;
+  if (!boundDeviceSerial) return false;
+
+  const senderSerial = data?.device_serial || data?.deviceSerial;
+  const senderRequiredTypes = new Set([
+    'pairing_request',
+    'room_create',
+    'room_join',
+    'room_leave',
+    'offer',
+    'answer',
+    'ice_candidate',
+    'connection_state',
+  ]);
+
+  if (senderRequiredTypes.has(type) && senderSerial !== boundDeviceSerial) {
+    return false;
+  }
+
+  if ((type === 'offer' || type === 'answer' || type === 'ice_candidate') && data?.room_code) {
+    const room = rooms.get(data.room_code);
+    if (!room || !room.participants.includes(boundDeviceSerial)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 app.get('/health', (req, res) => {
