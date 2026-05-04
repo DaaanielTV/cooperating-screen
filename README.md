@@ -1,3 +1,8 @@
+## Warranty & Liability
+This software is provided "as is", without warranty of any kind. See the LICENSE file for the full GPL-3.0 disclaimer of warranty and limitation of liability.
+
+I'm not responsible if this breaks your setup. Test it before using it in production.
+
 # Cooperating Screen
 
 Cooperating Screen is an open-source cross-device screen sharing project built with Flutter, WebRTC, and a Node.js signaling service.
