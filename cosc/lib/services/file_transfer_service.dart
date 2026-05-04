@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:path/path.dart' as p;
 import 'package:crypto/crypto.dart';
 import 'data_channel_service.dart';
 import 'package:uuid/uuid.dart';
@@ -50,9 +51,12 @@ class FileTransferProgress {
 
 class FileTransferService {
   final DataChannelService dataChannelService;
+  final String? allowedSaveDirectory;
   
   static const int chunkSize = 16384; // 16KB chunks
   static const int maxConcurrentTransfers = 3;
+  static const int maxInboundFileSizeBytes = 100 * 1024 * 1024; // 100MB
+  static const int maxChunksPerTransfer = 7000;
   
   final _activeTransfers = <String, FileTransferProgress>{};
   final _receivedChunks = <String, Map<int, Uint8List>>{};
@@ -62,7 +66,10 @@ class FileTransferService {
   Function(String, String)? onTransferComplete;
   Function(String, String)? onTransferError;
 
-  FileTransferService({required this.dataChannelService});
+  FileTransferService({
+    required this.dataChannelService,
+    this.allowedSaveDirectory,
+  });
 
   /// Start sending a file
   Future<String?> sendFile({
@@ -155,7 +162,15 @@ class FileTransferService {
     required String savePath,
   }) async {
     try {
+      if (fileSize <= 0 || fileSize > maxInboundFileSizeBytes) {
+        onTransferError?.call(transferId, 'Invalid or too large file size');
+        return;
+      }
       final totalChunks = (fileSize / chunkSize).ceil();
+      if (totalChunks > maxChunksPerTransfer) {
+        onTransferError?.call(transferId, 'File has too many chunks');
+        return;
+      }
       final progress = FileTransferProgress(
         transferId: transferId,
         fileName: fileName,
@@ -185,6 +200,10 @@ class FileTransferService {
       }
 
       final progress = _activeTransfers[transferId]!;
+      if (chunkIndex < 0 || chunkIndex >= progress.totalChunks) {
+        onTransferError?.call(transferId, 'Invalid chunk index');
+        return;
+      }
       _receivedChunks[transferId]![chunkIndex] = chunkData;
 
       progress.updateTransferred(chunkData.length);
@@ -215,7 +234,8 @@ class FileTransferService {
       }
 
       // Reassemble file
-      final file = File(savePath);
+      final sanitizedPath = _sanitizeAndValidateSavePath(savePath);
+      final file = File(sanitizedPath);
       final sink = file.openWrite();
       
       for (int i = 0; i < chunks.length; i++) {
@@ -242,6 +262,29 @@ class FileTransferService {
     } catch (e) {
       onTransferError?.call(transferId, 'Error completing transfer: $e');
     }
+  }
+
+  String _sanitizeAndValidateSavePath(String savePath) {
+    if (savePath.contains('\u0000')) {
+      throw ArgumentError('Invalid save path');
+    }
+
+    final normalized = p.normalize(savePath);
+    final pathSegments = p.split(normalized);
+    if (pathSegments.contains('..')) {
+      throw ArgumentError('Path traversal detected');
+    }
+
+    if (allowedSaveDirectory != null) {
+      final baseDir = p.normalize(p.absolute(allowedSaveDirectory!));
+      final outputPath = p.normalize(p.absolute(normalized));
+      if (!p.isWithin(baseDir, outputPath) && outputPath != baseDir) {
+        throw ArgumentError('Save path outside allowed directory');
+      }
+      return outputPath;
+    }
+
+    return normalized;
   }
 
   /// Get transfer progress
